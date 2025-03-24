@@ -122,6 +122,3 @@ async def predict_disease(file: UploadFile = File(...)):
     return JSONResponse(content=response)
 
 # For running the app directly
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
