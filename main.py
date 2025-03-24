@@ -1,13 +1,10 @@
-
-
-
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import tensorflow as tf
 import numpy as np
-import cv2
 import io
+from PIL import Image
 
 app = FastAPI(title="Skin Disease Classification API")
 
@@ -23,7 +20,7 @@ app.add_middleware(
 # Load the models
 def load_models():
     # Define list of class names
-    class_names = ["Acne", "Eczema", "Atopic", "Psoriasis", "Tinea", "vitiligo"]
+    class_names = ["Acne", "Eczema", "Atopic", "Psoriasis", "Tinea", "Vitiligo"]
     
     # Load the VGG16 model for feature extraction
     vgg_model = tf.keras.applications.VGG16(include_top=False, weights='imagenet', input_shape=(180, 180, 3))
@@ -33,6 +30,7 @@ def load_models():
     
     return vgg_model, model, class_names
 
+# Initialize models
 vgg_model, disease_model, class_names = load_models()
 
 @app.get("/")
@@ -44,13 +42,13 @@ async def predict_disease(file: UploadFile = File(...)):
     # Read the file as bytes
     contents = await file.read()
     
-    # Convert bytes to numpy array
-    nparr = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    # Use PIL instead of OpenCV to avoid system dependencies
+    image = Image.open(io.BytesIO(contents))
+    image = image.convert("RGB")  # Ensure image is in RGB format
+    image = image.resize((180, 180))  # Resize image
     
-    # Resize and preprocess the image
-    img = cv2.resize(img, (180, 180))
-    img = np.array(img) / 255.0
+    # Convert to numpy array and preprocess
+    img = np.array(image) / 255.0
     img = np.expand_dims(img, axis=0)
     
     # Extract features using VGG16
@@ -67,9 +65,12 @@ async def predict_disease(file: UploadFile = File(...)):
     
     # Prepare response
     response = {
-        "prediction": predicted_class_name
+        "prediction": predicted_class_name,
+        "confidence": confidence
     }
     
     return JSONResponse(content=response)
 
-# For running the app directly
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
